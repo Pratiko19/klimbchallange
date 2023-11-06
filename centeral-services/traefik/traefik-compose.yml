@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - 80:80
+    deploy:
+      placement:
+        constraints:
+          - node.labels.tier==manager
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-network
+        - traefik.constraint-label=traefik-public
+        - traefik.http.middlewares.admin-auth.basicauth.users=Admin:$$apr1$$xljuqv7d$$DUU9tIVAP/1CXtav1gpAd/
+        - traefik.http.routers.traefik-public-http.rule=Host(`13.233.123.126`)
+        - traefik.http.routers.traefik-public-http.entrypoints=http
+        - traefik.http.routers.traefik-public-http.service=api@internal
+        - traefik.http.routers.traefik-public-http.middlewares=admin-auth
+        - traefik.http.services.traefik-public.loadbalancer.server.port=8080
+        - traefik.http.middlewares.waf.plugin.traefik-modsecurity-plugin.modSecurityUrl=http://waf:80
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --providers.docker
+      - --providers.docker.constraints=Label(`traefik.constraint-label`, `traefik-public`)
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.swarmmode
+      - --entrypoints.http.address=:80
+      - --accesslog
+      - --log
+      - --api
+      - --experimental.plugins.traefik-modsecurity-plugin.modulename=github.com/acouvreur/traefik-modsecurity-plugin
+      - --experimental.plugins.traefik-modsecurity-plugin.version=v1.3.0
+    networks:
+      - traefik-network
+
+  waf:
+    image: owasp/modsecurity-crs:nginx-alpine
+    environment:
+      - PARANOIA=2
+      - ANOMALY_INBOUND=10
+      - ANOMALY_OUTBOUND=5
+      - BACKEND=http://dummy
+    networks:
+      - traefik-network
+    deploy:
+      placement:
+        constraints:
+          - node.labels.tier==manager
+
+
+  dummy:
+    image: traefik/whoami
+    networks:
+      - traefik-network
+    deploy:
+      placement:
+        constraints:
+          - node.labels.tier==manager
+
+networks:
+  traefik-network:
+    external: true

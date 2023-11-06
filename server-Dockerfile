@@ -1,0 +1,6 @@
+FROM node:20-alpine
+WORKDIR /app
+COPY . .
+EXPOSE 4242
+RUN npm install
+ENTRYPOINT ["npm", "run", "start-server"]

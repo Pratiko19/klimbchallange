@@ -1,0 +1,89 @@
+version: "3.8"
+
+networks:
+  application-network:
+  traefik-network:
+    external: true
+
+
+services:
+
+  server:
+    image: pratiko13/klimbserver:latest
+    networks:
+      - application-network
+      - traefik-network
+    deploy:
+      mode: replicated
+      replicas: 2
+      placement:
+        max_replicas_per_node: 4
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-network
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.server-http.rule=Host(`server.example.com`)
+        - traefik.http.routers.server-http.entrypoints=http
+        - traefik.http.services.server.loadbalancer.server.port=4242
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 30s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 30s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+          #    healthcheck:
+          #      test: ["CMD", "curl", "http://localhost:4242"]
+          #      interval: 30s
+          #      timeout: 10s
+          #      retries: 3
+          #      start_period: 30s
+    stop_grace_period: 30s
+
+  client:
+    image: pratiko13/klimbclient:latest
+    networks:
+      - application-network
+      - traefik-network
+    deploy:
+      mode: replicated
+      replicas: 2
+      placement:
+        max_replicas_per_node: 4
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-network
+        - traefik.constraint-label=traefik-public
+        - traefik.http.routers.client-http.rule=Host(`client.example.com`)
+        - traefik.http.routers.client-http.entrypoints=http
+        - traefik.http.services.client.loadbalancer.server.port=3000
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 30s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 30s
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+          #    healthcheck:
+          #      test: ["CMD", "curl", "http://localhost:3000"]
+          #      interval: 30s
+          #      timeout: 10s
+          #      retries: 3
+          #      start_period: 30s
+    stop_grace_period: 30s
